@@ -1,17 +1,78 @@
 #%%
-
 # importing the libraries
 import pandas as pd
 import artm
 import math
 from tqdm import tqdm
+from textblob import TextBlob
+
+
+import nltk
+from nltk.tokenize import RegexpTokenizer
+from nltk.stem import WordNetLemmatizer, PorterStemmer
+from nltk.stem.snowball import SnowballStemmer 
+from nltk.corpus import stopwords
+import re
+
+stemmerRu = SnowballStemmer("russian") 
+stemmerEn = PorterStemmer()
+#lemmatizer = WordNetLemmatizer()
+import numpy as np
+#%%
+#made data more suitable for json parsing mechanism
+
+
+#uploading data
+df0 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/0_28c5a7ee_id-psy_posts.json')
+df1 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/1_18f10508_id-psy_posts.json')
+df2 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/2_8e726921_id-psy_posts.json')
+df3 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
+#%%
+#union all
+
+
+df = pd.concat([df0, df1, df2, df3])
+#%%
+#droping empty lines 
+
+
+df['text'].replace('', np.nan, inplace=True)
+df.dropna(subset=['text'], inplace=True)
+#%% 
+#defining preprocessing function 
+
+
+def preprocess(sentence):
+    sentence=str(sentence)
+    sentence = sentence.lower()
+    sentence=sentence.replace('{html}',"") 
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', sentence)
+    rem_url=re.sub(r'http\S+', '',cleantext)
+    rem_num = re.sub('[0-9]+', '', rem_url)
+    tokenizer = RegexpTokenizer(r'\w+')
+    tokens = tokenizer.tokenize(rem_num)  
+    filtered_words = [w for w in tokens if len(w) > 2 if not w in stopwords.words('russian')]
+    stem_words=[stemmerRu.stem(w) for w in filtered_words]
+    stem_words=[stemmerEn.stem(w) for w in stem_words]
+    return " ".join(stem_words)
+#%%
+#cleaning text
+cleanedData = df['text'].map(lambda s:preprocess(s)) 
+
 
 #%%
-
 # uploading data & picking only text part
-df = pd.read_csv(r'/Users/apple/Documents/BDML /НИР/train.csv')
-dataset1 = df['text']
+df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
+#def blobbing_lang(text):
+#    try:
+#        return TextBlob(text).detect_language()
+#    except:
+#        return None
+#df['language'] = df['text'].apply(blobbing_lang)
+#dataset1 = df['text']
 
+#%%
 # creating the function for transformation to vowpal_wabbit format
 
 
@@ -83,18 +144,19 @@ def df_to_vw_classification(
 #%%
 
 # changing the type of data created
-vw = df_to_vw_regression(df, filepath='data.txt', target='text')
-# vw = df_to_vw_classification(df, filepath='data.txt', target='target')
+vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt', target='text')
+# vw1 = df_to_vw_classification(df, filepath='data.txt', target='target')
 
 #%%
 
 # batching data for applying it to our model
-
-
-batch_vectorizer = artm.BatchVectorizer(data_path='data.txt',
+batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',
                                         data_format='vowpal_wabbit',
                                         collection_name='vw',
                                         target_folder='koselniy_batches')
+
+#batch_vectorizer = artm.BatchVectorizer(data_path='koselniy_batches', data_format='batches')
+
 
 #%% md
 
@@ -105,14 +167,17 @@ batch_vectorizer = artm.BatchVectorizer(data_path='data.txt',
 # setting up lda parameters
 
 
-lda = artm.LDA(num_topics=10,
-               alpha=0.01, beta=0.001,
+lda = artm.LDA(num_topics=40,
+               alpha=0.01, beta=0.1,
                cache_theta=True,
-               num_document_passes=2,
+               num_document_passes=5,
                dictionary=batch_vectorizer.dictionary)
+
+
+
 #Phi is the ‘parts-versus-topics’ matrix, and theta is the ‘composites-versus-topics’ matrix
-lda.fit_offline(batch_vectorizer=batch_vectorizer,
-                num_collection_passes=10)
+lda.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=10)
+
 
 #checking up the parametrs of the matricies
 lda.sparsity_phi_last_value
@@ -121,6 +186,7 @@ lda.perplexity_last_value
 
 #%%
 
+
 #top tokens for each class of all the clusters we've got
 top_tokens = lda.get_top_tokens(num_tokens=200)
 for i, token_list in enumerate(top_tokens):
@@ -128,23 +194,22 @@ for i, token_list in enumerate(top_tokens):
 
 d = pd.DataFrame(top_tokens)
 top_tokens_vec= d.apply(lambda x: ' '.join(x), axis=1)
+#%%
 
+LDAphi = lda.phi_
 #%% md
+LDAtheta = lda.get_theta()
 
+#%%
 # ARTM (BigARTM package) Model
 
 #%%
 
-#creating the batches for the second model and setting up bigartm dictionary
-batch_vectorizer2 = artm.BatchVectorizer(data_path='data.txt',
-                                         data_format='vowpal_wabbit',
-                                         collection_name='vw',
-                                         target_folder='koselniy_batches')
-dictionary = batch_vectorizer2.dictionary
+dictionary = batch_vectorizer.dictionary
 
 #%%
 
-topic_names = ['topic_{}'.format(i) for i in range(15)]
+topic_names = ['topic_{}'.format(i) for i in range(40)]
 #inial objects cration
 model_plsa = artm.ARTM(topic_names=topic_names, cache_theta=True,
                        scores=[artm.PerplexityScore(name='PerplexityScore',
@@ -153,29 +218,36 @@ model_artm = artm.ARTM(topic_names=topic_names, cache_theta=True,
                        scores=[artm.PerplexityScore(name='PerplexityScore',
                                                     dictionary=dictionary)],
                        regularizers=[artm.SmoothSparseThetaRegularizer(name='SparseTheta',
-                                                                       tau=-0.15)])
+                                                                       tau=0.1)])
 
 #%%
-
-#adding some scores for our future model
+# adding some scores for our future model
+# PLSA
 model_plsa.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore'))
 model_plsa.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
 model_plsa.scores.add(artm.TopicKernelScore(name='TopicKernelScore',probability_mass_threshold=0.3))
-model_plsa.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=15, class_id='text'))
+model_plsa.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=20, class_id='text'))
+model_plsa.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=200))
+
+
+# ARTM
 model_artm.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore'))
 model_artm.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
 model_artm.scores.add(artm.TopicKernelScore(name='TopicKernelScore',probability_mass_threshold=0.3))
-model_artm.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=15, class_id='text'))
-model_plsa.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=200))
+model_artm.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=20, class_id='text'))
 model_artm.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=200))
 
-#regulizers
-model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='SparsePhi', tau=-0.1))
-model_artm.regularizers.add(artm.DecorrelatorPhiRegularizer(name='DecorrelatorPhi', tau=0.01))
 
+#regulizers
+#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='SparsePhi', tau=-0.1))
+#model_artm.regularizers.add(artm.DecorrelatorPhiRegularizer(name='DecorrelatorPhi', tau=1.5e+4))
+
+#%%
+#setting up the number of tokens
 model_plsa.num_document_passes = 1
 model_artm.num_document_passes = 1
 
+#%%
 #initializing the model we've set up
 model_plsa.initialize(dictionary=dictionary)
 model_artm.initialize(dictionary=dictionary)
@@ -183,12 +255,79 @@ model_artm.initialize(dictionary=dictionary)
 #%%
 
 #fitting the model
-#model_plsa.fit_offline(batch_vectorizer=batch_vectorizer2, num_collection_passes=15)
-model_artm.fit_offline(batch_vectorizer=batch_vectorizer2, num_collection_passes=10)
+model_plsa.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=15)
+model_artm.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=15)
 
 #%%
+phi = model_artm.get_phi()
+theta = model_artm.get_theta()
 
-#pickling te new model
+#%%
+%matplotlib inline
+import glob
+import os
+import matplotlib.pyplot as plt
+
+import artm
+#%%
+# adding scores crhecking and plot
+def print_measures(model_plsa, model_artm):
+    print('Sparsity Phi: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
+        model_plsa.score_tracker['SparsityPhiScore'].last_value,
+        model_artm.score_tracker['SparsityPhiScore'].last_value))
+
+    print('Sparsity Theta: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
+        model_plsa.score_tracker['SparsityThetaScore'].last_value,
+        model_artm.score_tracker['SparsityThetaScore'].last_value))
+
+    print('Kernel contrast: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
+        model_plsa.score_tracker['TopicKernelScore'].last_average_contrast,
+        model_artm.score_tracker['TopicKernelScore'].last_average_contrast))
+
+    print('Kernel purity: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
+        model_plsa.score_tracker['TopicKernelScore'].last_average_purity,
+        model_artm.score_tracker['TopicKernelScore'].last_average_purity))
+
+    print('Perplexity: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
+        model_plsa.score_tracker['PerplexityScore'].last_value,
+        model_artm.score_tracker['PerplexityScore'].last_value))
+
+    plt.plot(range(model_plsa.num_phi_updates),
+             model_plsa.score_tracker['PerplexityScore'].value, 'b--',
+             range(model_artm.num_phi_updates),
+             model_artm.score_tracker['PerplexityScore'].value, 'r--', linewidth=2)
+    plt.xlabel('Iterations count')
+    plt.ylabel('PLSA perp. (blue), ARTM perp. (red)')
+    plt.grid(True)
+    plt.show()
+
+
+# printing results
+print_measures(model_plsa, model_artm)
+#%%
+#comparing Phi & Theta matricies
+
+
+plt.plot(range(model_plsa.num_phi_updates),
+         model_plsa.score_tracker['SparsityPhiScore'].value, 'b--',
+         range(model_artm.num_phi_updates),
+         model_artm.score_tracker['SparsityPhiScore'].value, 'r--', linewidth=2)
+
+plt.xlabel('Iterations count')
+plt.ylabel('PLSA Phi sp. (blue), ARTM Phi sp. (red)')
+plt.grid(True)
+plt.show()
+
+plt.plot(range(model_plsa.num_phi_updates),
+         model_plsa.score_tracker['SparsityThetaScore'].value, 'b--',
+         range(model_artm.num_phi_updates),
+         model_artm.score_tracker['SparsityThetaScore'].value, 'r--', linewidth=2)
+
+plt.xlabel('Iterations count')
+plt.ylabel('PLSA Theta sp. (blue), ARTM Theta sp. (red)')
+plt.grid(True)
+plt.show()
+
 
 #%%
 
@@ -204,11 +343,11 @@ print(model_artm.score_tracker["TopicKernelScore"])
 
 #print(model_plsa.score_tracker["TopicKernelScore"])
 
-#%%
+
 
 #checking up the top words
 #print(model_artm.score_tracker["Top_words"])
-print(model_artm.score_tracker["Top_words"])
+#print(model_artm.score_tracker["Top_words"])
 #print(model_artm.)
 
 #%%
@@ -217,15 +356,20 @@ for topic_name in model_artm.topic_names:
     print(topic_name + ': '),
     print(model_artm.score_tracker['TopTokensScore'].last_tokens[topic_name])
 
-#%%
 
+#%%
 artmTokens = model_artm.score_tracker['TopTokensScore'].last_tokens
+#%%
+artmPhi = model_artm.phi_
+
+#%%
 artmTokens = pd.DataFrame(artmTokens)
 artmToks= artmTokens.apply(lambda x: ' '.join(x), axis=0)
 artmToks
 
 #%% md
 
+#%%
 # KMeans model
 
 #%%
@@ -284,7 +428,7 @@ warnings.filterwarnings('ignore')
 
 #%%
 
-from deeppavlov.dataset_iterators.basic_classification_iterator import BasicClassificationDatasetIterator
+#from deeppavlov.dataset_iterators.basic_classification_iterator import BasicClassificationDatasetIterator
 #iterator = BasicClassificationDatasetIterator(data, seed=42, shuffle=True)
 #for batch in iterator.gen_batches(data_type="train", batch_size=13):
 #    print(batch)
@@ -293,7 +437,7 @@ from deeppavlov.dataset_iterators.basic_classification_iterator import BasicClas
 #%%
 
 #importing more libraries
-import math
+#import math
 
 #downloading te right vocabulaty
 from deeppavlov.models.preprocessors.bert_preprocessor import BertPreprocessor
@@ -306,7 +450,7 @@ bert_preprocessor = BertPreprocessor(vocab_file="~/.deeppavlov/downloads/bert_mo
 #%%
 
 from deeppavlov.models.bert.bert_classifier import BertClassifierModel
-from deeppavlov.metrics.accuracy import sets_accuracy
+#from deeppavlov.metrics.accuracy import sets_accuracy
 bert_classifier = BertClassifierModel(
     n_classes=15,
     return_probas=False,
@@ -338,7 +482,7 @@ vocab = SimpleVocabulary(save_path="./binary_classes.dict")
 
 #%%
 
-from pytorch_transformers import BertForPreTraining, BertConfig, BertTokenizer, load_tf_weights_in_bert, BertModel
+from pytorch_transformers import BertForPreTraining, BertConfig, BertTokenizer, load_tf_weights_in_bert #BertModel
 
 #%% md
 
