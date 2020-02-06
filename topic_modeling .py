@@ -693,14 +693,14 @@ feature_names = np.asarray(feature_names)
 print("accuracy score: " + str(model.score(X_test, y_test)))
 #accuracy score: 0.8038830593120476
 
-#%%
 
-import dill as pickle
+
+#import dill as pickle
 
 #with open('testing_model.pk', 'wb') as file:
 #    pickle.dump(model, file)
-with open('testing_model.pk','rb') as f:
-    model = pickle.load(f)
+#with open('testing_model.pk','rb') as f:
+#    model = pickle.load(f)
 
 
 #%%
