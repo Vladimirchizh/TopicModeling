@@ -1,43 +1,58 @@
 #%%
 # importing the libraries
+# basic stuff
 import pandas as pd
-import artm
+import numpy as np
 import math
-from tqdm import tqdm
-from textblob import TextBlob
-
-
-import nltk
+import re
+import nltk #swiss knife army for nlp
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem import WordNetLemmatizer, PorterStemmer
 from nltk.stem.snowball import SnowballStemmer 
 from nltk.corpus import stopwords
-import re
+from tqdm import tqdm
 
+
+# regularization 
+import artm
+
+
+# sklearn
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+
+#lemmatizer = WordNetLemmatizer()
+
+#%%
+# made data more suitable for json parsing mechanism
+
+
+# nltk stemmers
 stemmerRu = SnowballStemmer("russian") 
 stemmerEn = PorterStemmer()
-#lemmatizer = WordNetLemmatizer()
-import numpy as np
-#%%
-#made data more suitable for json parsing mechanism
 
-
-#uploading data
+# uploading data
 df0 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/0_28c5a7ee_id-psy_posts.json')
 df1 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/1_18f10508_id-psy_posts.json')
 df2 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/2_8e726921_id-psy_posts.json')
 df3 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
+#df_test = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
+# alternative
+#df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
 #%%
-#union all
-
-
-df = pd.concat([df0, df1, df2, df3])
-#%%
-#droping empty lines 
-
-
+#union all and dropping empty lines 
+df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
 df['text'].replace('', np.nan, inplace=True)
 df.dropna(subset=['text'], inplace=True)
+df.reset_index(drop=True, inplace=True)
+
+
+#df_test['text'].replace('', np.nan, inplace=True)
+#df_test.dropna(subset=['text'], inplace=True)
 #%% 
 #defining preprocessing function 
 
@@ -57,20 +72,9 @@ def preprocess(sentence):
     stem_words=[stemmerEn.stem(w) for w in stem_words]
     return " ".join(stem_words)
 #%%
-#cleaning text
-cleanedData = df['text'].map(lambda s:preprocess(s)) 
+# cleaning text
+df['text'] = df['text'].map(lambda s:preprocess(s)) 
 
-
-#%%
-# uploading data & picking only text part
-df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
-#def blobbing_lang(text):
-#    try:
-#        return TextBlob(text).detect_language()
-#    except:
-#        return None
-#df['language'] = df['text'].apply(blobbing_lang)
-#dataset1 = df['text']
 
 #%%
 # creating the function for transformation to vowpal_wabbit format
@@ -142,18 +146,16 @@ def df_to_vw_classification(
             f.write('\n')
 
 #%%
-
 # changing the type of data created
 vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt', target='text')
 # vw1 = df_to_vw_classification(df, filepath='data.txt', target='target')
 
 #%%
-
 # batching data for applying it to our model
 batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',
                                         data_format='vowpal_wabbit',
                                         collection_name='vw',
-                                        target_folder='koselniy_batches')
+                                        target_folder='batches')
 
 #batch_vectorizer = artm.BatchVectorizer(data_path='koselniy_batches', data_format='batches')
 
@@ -167,8 +169,8 @@ batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_model
 # setting up lda parameters
 
 
-lda = artm.LDA(num_topics=40,
-               alpha=0.01, beta=0.1,
+lda = artm.LDA(num_topics=20,
+               alpha=0.001, beta=0.019,
                cache_theta=True,
                num_document_passes=5,
                dictionary=batch_vectorizer.dictionary)
@@ -196,20 +198,73 @@ d = pd.DataFrame(top_tokens)
 top_tokens_vec= d.apply(lambda x: ' '.join(x), axis=1)
 #%%
 
-LDAphi = lda.phi_
-#%% md
-LDAtheta = lda.get_theta()
+lda_phi = lda.phi_
+lda_theta = lda.get_theta()
 
+#%% 
+# alternaive lda via sklearn
+tf_idf = TfidfVectorizer(stop_words=stopwords.words('russian'), ngram_range = (1, 2), max_df=.25, max_features=5000) 
+#count = CountVectorizer(stop_words=stopwords.words('russian'), max_df=.1, max_features=5000) 
+X = tf_idf.fit_transform(df['text'].values)
+lda = LatentDirichletAllocation(n_components=25, random_state=123, learning_method='batch', n_jobs = -1, max_iter = 10)
+
+#%%
+X_topics = lda.fit_transform(X)
+n_top_words = 10
+feature_names = tf_idf.get_feature_names()
+#%%
+# leading topic
+X_topics = pd.DataFrame(X_topics)
+X_topics.reset_index(drop=True, inplace=True)
+
+#%%
+# top tokens
+
+for topic_idx, topic in enumerate(lda.components_):
+  print("Topic %d:" % (topic_idx + 1))
+  print(' '.join([feature_names[i]
+  for i in topic.argsort()
+    [:-n_top_words - 1:-1]]))
+    
+#%%
+phi_numbers = pd.DataFrame(lda.components_).transpose()
+f_names = pd.DataFrame(feature_names)
+lda_skl_phi = pd.concat([ f_names, phi_numbers], axis=1)
+#%%
+# concating initial dataset with topics
+
+messages_topics = pd.concat([df, X_topics], axis = 1)
+
+# adding leading topic
+
+messages_topics['leading_topic'] = X_topics.idxmax(axis=1)
+#%%
+import markovify
+mt  = messages_topics[messages_topics['leading_topic'] == 1]
+
+# simple state markov chain 
+
+text_model = markovify.Text(mt['text'], state_size= 2 )
+text_model.compile(inplace = True)
+for i in range(5):
+    print(text_model.make_short_sentence(280))
+#%%  
+# combining 2 models 
+
+model_a = markovify.Text(messages_topics[messages_topics['leading_topic'] == 11]['text'], state_size = 2 )
+model_b = markovify.Text(messages_topics[messages_topics['leading_topic'] == 7]['text'], state_size= 2)
+
+model_combo = markovify.combine([ model_a, model_b ], [ 1.5, 1 ])
+for i in range(5):
+    print(model_combo.make_sentence())
 #%%
 # ARTM (BigARTM package) Model
-
-#%%
 
 dictionary = batch_vectorizer.dictionary
 
 #%%
 
-topic_names = ['topic_{}'.format(i) for i in range(40)]
+topic_names = ['topic_{}'.format(i) for i in range(100)]
 #inial objects cration
 model_plsa = artm.ARTM(topic_names=topic_names, cache_theta=True,
                        scores=[artm.PerplexityScore(name='PerplexityScore',
@@ -218,7 +273,7 @@ model_artm = artm.ARTM(topic_names=topic_names, cache_theta=True,
                        scores=[artm.PerplexityScore(name='PerplexityScore',
                                                     dictionary=dictionary)],
                        regularizers=[artm.SmoothSparseThetaRegularizer(name='SparseTheta',
-                                                                       tau=0.1)])
+                                                                       tau=0.05)])
 
 #%%
 # adding some scores for our future model
@@ -227,7 +282,7 @@ model_plsa.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore'))
 model_plsa.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
 model_plsa.scores.add(artm.TopicKernelScore(name='TopicKernelScore',probability_mass_threshold=0.3))
 model_plsa.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=20, class_id='text'))
-model_plsa.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=200))
+model_plsa.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=300))
 
 
 # ARTM
@@ -235,11 +290,11 @@ model_artm.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore'))
 model_artm.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
 model_artm.scores.add(artm.TopicKernelScore(name='TopicKernelScore',probability_mass_threshold=0.3))
 model_artm.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=20, class_id='text'))
-model_artm.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=200))
+model_artm.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=300))
 
 
 #regulizers
-#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='SparsePhi', tau=-0.1))
+model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='SparsePhi', tau=-0.05))
 #model_artm.regularizers.add(artm.DecorrelatorPhiRegularizer(name='DecorrelatorPhi', tau=1.5e+4))
 
 #%%
@@ -259,8 +314,8 @@ model_plsa.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=
 model_artm.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=15)
 
 #%%
-phi = model_artm.get_phi()
-theta = model_artm.get_theta()
+artm_phi = model_artm.get_phi()
+artm_theta = model_artm.get_theta()
 
 #%%
 %matplotlib inline
@@ -370,7 +425,7 @@ artmToks
 #%% md
 
 #%%
-# KMeans model
+## KMeans model
 
 #%%
 
@@ -383,13 +438,13 @@ from nltk.corpus import stopwords
 # retrieving text: setting up stop words, making Tf-Idf
 words = stopwords.words('russian')
 vectorizer = TfidfVectorizer(stop_words=words)
-X = vectorizer.fit_transform(dataset1)
+X = vectorizer.fit_transform(df['text'])
 
 #%%
 
 # counting KMeans for 13 clusters and fitting vectorized data in to the model
 true_k = 18
-model = KMeans(n_clusters=true_k, init='k-means++', max_iter=10, n_init=1)
+model = KMeans(n_clusters=true_k, init='k-means++', max_iter=100, n_init=10)
 model.fit(X)
 
 #%%
