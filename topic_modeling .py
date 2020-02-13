@@ -11,8 +11,7 @@ from nltk.stem import WordNetLemmatizer, PorterStemmer
 from nltk.stem.snowball import SnowballStemmer 
 from nltk.corpus import stopwords
 from tqdm import tqdm
-
-
+#%%
 # regularization 
 import artm
 
@@ -24,16 +23,16 @@ from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
+#from pymystem3 import Mystem
 
-#lemmatizer = WordNetLemmatizer()
+# nltk stemmers
+stemmerRu = SnowballStemmer("russian") 
+stemmerEn = PorterStemmer()
 
 #%%
 # made data more suitable for json parsing mechanism
 
 
-# nltk stemmers
-stemmerRu = SnowballStemmer("russian") 
-stemmerEn = PorterStemmer()
 
 # uploading data
 df0 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/0_28c5a7ee_id-psy_posts.json')
@@ -41,9 +40,9 @@ df1 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/1_18f10508_id-psy_posts
 df2 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/2_8e726921_id-psy_posts.json')
 df3 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
 #df_test = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
+#%%
 # alternative
 #df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
-#%%
 #union all and dropping empty lines 
 df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
 df['text'].replace('', np.nan, inplace=True)
@@ -56,7 +55,6 @@ df.reset_index(drop=True, inplace=True)
 #%% 
 #defining preprocessing function 
 
-
 def preprocess(sentence):
     sentence=str(sentence)
     sentence = sentence.lower()
@@ -68,19 +66,23 @@ def preprocess(sentence):
     tokenizer = RegexpTokenizer(r'\w+')
     tokens = tokenizer.tokenize(rem_num)  
     filtered_words = [w for w in tokens if len(w) > 2 if not w in stopwords.words('russian')]
-    stem_words=[stemmerRu.stem(w) for w in filtered_words]
-    stem_words=[stemmerEn.stem(w) for w in stem_words]
-    return " ".join(stem_words)
+    #stem_words=[stemmerRu.stem(w) for w in filtered_words]
+    #lemms = [Mystem.lemmatize(str(w)) for w in filtered_words]
+    #stem_words=[stemmerEn.stem(w) for w in stem_words]
+    return " ".join(filtered_words)
 #%%
 # cleaning text
-df['text'] = df['text'].map(lambda s:preprocess(s)) 
 
+df['text'] = df['text'].map(lambda s:preprocess(s)) 
+df['text'].replace('', np.nan, inplace=True)
+df.dropna(subset=['text'], inplace=True)
+df.reset_index(drop=True, inplace=True)
 
 #%%
 # creating the function for transformation to vowpal_wabbit format
 
 
-def df_to_vw_regression(df, filepath='in.txt', columns=None, target=None, namespace='namespace'):
+def df_to_vw_regression(df, filepath='in.txt', columns=None, target=None, namespace='text'):
     if columns is None:
         columns = df.columns.tolist()
     columns.remove(target)
@@ -88,7 +90,7 @@ def df_to_vw_regression(df, filepath='in.txt', columns=None, target=None, namesp
     with open(filepath, 'w') as f:
         for _, row in tqdm(df.iterrows()):
             if namespace:
-                f.write('{0} |{1} '.format(row[target], namespace))
+                f.write('|{0} '.format( namespace))
             else:
                 f.write('{0} | '.format(row[target]))
             last_feature = row.index.values[-1]
@@ -96,76 +98,39 @@ def df_to_vw_regression(df, filepath='in.txt', columns=None, target=None, namesp
                 if idx not in columns:
                     continue
                 if isinstance(val, str):
-                    f.write('{0}'.format(val.replace(' ', '_').replace(':', '_')))
+                    f.write('{0}'.format(val.replace(' ', ' ').replace(':', ' ')))
                 elif isinstance(val, float) or isinstance(val, int):
                     if not math.isnan(val):
-                        f.write('{0}:{1}'.format(idx.replace(' ', '_').replace(':', '_'), val))
+                        f.write('{0}:{1}'.format(idx.replace(' ', ' ').replace(':', ' '), val))
                     else:
                         continue
                 else:
-                    f.write('{0}'.format(val.replace(' ', '_').replace(':', '_')))
+                    f.write('{0}'.format(val.replace(' ', ' ').replace(':', ' ')))
                 if idx != last_feature:
                     f.write(' ')
             f.write('\n')
 
-
-def df_to_vw_classification(
-        df,
-        filepath='mc.txt',
-        columns=None,
-        target=None,
-        tag=None,
-        namespace='n'
-):
-    if columns is None:
-        columns = df.columns.tolist()
-    columns.remove(target)
-    columns.remove(tag)
-
-    with open(filepath, 'w') as f:
-        for _, row in tqdm(df.iterrows()):
-            if namespace:
-                f.write(f"{row[target]} \'{row[tag]} |{namespace} ")
-            else:
-                f.write(f"{row[target]} \'{row[tag]} | ")
-            last_feature = columns[-1]
-            for idx, val in row.iteritems():
-                if idx not in columns:
-                    continue
-                if isinstance(val, str):
-                    f.write(f"{val.replace(' ', '_').replace(':', '_')}")
-                elif isinstance(val, float) or isinstance(val, int):
-                    if not math.isnan(val):
-                        f.write(f"{idx.replace(' ', '_').replace(':', '_')}:{val}")
-                    else:
-                        continue
-                else:
-                    f.write(f"{val.replace(' ', '_').replace(':', '_')}")
-                if idx != last_feature:
-                    f.write(' ')
-            f.write('\n')
 
 #%%
 # changing the type of data created
-vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt', target='text')
-# vw1 = df_to_vw_classification(df, filepath='data.txt', target='target')
+
+#vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',  target = 'owner_id')
 
 #%%
 # batching data for applying it to our model
-batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',
-                                        data_format='vowpal_wabbit',
-                                        collection_name='vw',
-                                        target_folder='batches')
+#batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',
+#                                        data_format='vowpal_wabbit',
+#                                        collection_name= 'vw',
+#                                        target_folder='my_collection_batches')
 
-#batch_vectorizer = artm.BatchVectorizer(data_path='koselniy_batches', data_format='batches')
-
+batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_collection_batches',
+                                        data_format='batches')
 
 #%% md
 
 # LDA (BigARTM package) Model
 
 #%%
-
 # setting up lda parameters
 
 
@@ -178,7 +143,7 @@ lda = artm.LDA(num_topics=20,
 
 
 #Phi is the ‘parts-versus-topics’ matrix, and theta is the ‘composites-versus-topics’ matrix
-lda.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=10)
+lda.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=1)
 
 
 #checking up the parametrs of the matricies
@@ -190,7 +155,7 @@ lda.perplexity_last_value
 
 
 #top tokens for each class of all the clusters we've got
-top_tokens = lda.get_top_tokens(num_tokens=200)
+top_tokens = lda.get_top_tokens(num_tokens=10)
 for i, token_list in enumerate(top_tokens):
     print('Topic #{0}: {1}'.format(i, token_list))
 
@@ -260,169 +225,89 @@ for i in range(5):
 #%%
 # ARTM (BigARTM package) Model
 
-dictionary = batch_vectorizer.dictionary
+dictionary = artm.Dictionary()
+dictionary.gather(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_collection_batches')
+dictionary.save_text(dictionary_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_collection_batches/my_dictionary.txt')
 
 #%%
+#intial objects creation
+T=40
+topic_names = ['topic_{}'.format(i) for i in range(T)]
 
-topic_names = ['topic_{}'.format(i) for i in range(100)]
-#inial objects cration
-model_plsa = artm.ARTM(topic_names=topic_names, cache_theta=True,
-                       scores=[artm.PerplexityScore(name='PerplexityScore',
-                                                    dictionary=dictionary)])
-model_artm = artm.ARTM(topic_names=topic_names, cache_theta=True,
-                       scores=[artm.PerplexityScore(name='PerplexityScore',
-                                                    dictionary=dictionary)],
-                       regularizers=[artm.SmoothSparseThetaRegularizer(name='SparseTheta',
-                                                                       tau=0.05)])
-
-#%%
-# adding some scores for our future model
-# PLSA
-model_plsa.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore'))
-model_plsa.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
-model_plsa.scores.add(artm.TopicKernelScore(name='TopicKernelScore',probability_mass_threshold=0.3))
-model_plsa.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=20, class_id='text'))
-model_plsa.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=300))
-
-
-# ARTM
-model_artm.scores.add(artm.SparsityPhiScore(name='SparsityPhiScore'))
-model_artm.scores.add(artm.SparsityThetaScore(name='SparsityThetaScore'))
-model_artm.scores.add(artm.TopicKernelScore(name='TopicKernelScore',probability_mass_threshold=0.3))
-model_artm.scores.add(artm.TopTokensScore(name='Top_words', num_tokens=20, class_id='text'))
-model_artm.scores.add(artm.TopTokensScore(name='TopTokensScore', num_tokens=300))
-
-
-#regulizers
-model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='SparsePhi', tau=-0.05))
-#model_artm.regularizers.add(artm.DecorrelatorPhiRegularizer(name='DecorrelatorPhi', tau=1.5e+4))
-
-#%%
-#setting up the number of tokens
-model_plsa.num_document_passes = 1
-model_artm.num_document_passes = 1
+model_artm = artm.ARTM(dictionary = dictionary, topic_names= topic_names, cache_theta= True)
+model_artm.scores.add(artm.PerplexityScore(name='PerplexityScore',dictionary = dictionary))
+model_artm.scores.add(artm.TopTokensScore(name='top_words',num_tokens = 10))
 
 #%%
 #initializing the model we've set up
-model_plsa.initialize(dictionary=dictionary)
-model_artm.initialize(dictionary=dictionary)
+model_artm.initialize(dictionary)
+model_artm.num_document_passes = 3
+#%%
+model_artm.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=16)
 
 #%%
-
-#fitting the model
-model_plsa.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=15)
-model_artm.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=15)
+perplexityScore = list(model_artm.score_tracker['PerplexityScore'].value)
 
 #%%
-artm_phi = model_artm.get_phi()
-artm_theta = model_artm.get_theta()
-
-#%%
-%matplotlib inline
+#%matplotlib inline
 import glob
 import os
 import matplotlib.pyplot as plt
 
-import artm
+# %%
+# visualizing perplexity
+plt.scatter(range(len(perplexityScore)), perplexityScore)
+plt.xlabel('number of iterations')
+plt.ylabel('perplexity score')
 #%%
-# adding scores crhecking and plot
-def print_measures(model_plsa, model_artm):
-    print('Sparsity Phi: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
-        model_plsa.score_tracker['SparsityPhiScore'].last_value,
-        model_artm.score_tracker['SparsityPhiScore'].last_value))
-
-    print('Sparsity Theta: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
-        model_plsa.score_tracker['SparsityThetaScore'].last_value,
-        model_artm.score_tracker['SparsityThetaScore'].last_value))
-
-    print('Kernel contrast: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
-        model_plsa.score_tracker['TopicKernelScore'].last_average_contrast,
-        model_artm.score_tracker['TopicKernelScore'].last_average_contrast))
-
-    print('Kernel purity: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
-        model_plsa.score_tracker['TopicKernelScore'].last_average_purity,
-        model_artm.score_tracker['TopicKernelScore'].last_average_purity))
-
-    print('Perplexity: {0:.3f} (PLSA) vs. {1:.3f} (ARTM)'.format(
-        model_plsa.score_tracker['PerplexityScore'].last_value,
-        model_artm.score_tracker['PerplexityScore'].last_value))
-
-    plt.plot(range(model_plsa.num_phi_updates),
-             model_plsa.score_tracker['PerplexityScore'].value, 'b--',
-             range(model_artm.num_phi_updates),
-             model_artm.score_tracker['PerplexityScore'].value, 'r--', linewidth=2)
-    plt.xlabel('Iterations count')
-    plt.ylabel('PLSA perp. (blue), ARTM perp. (red)')
-    plt.grid(True)
-    plt.show()
-
-
-# printing results
-print_measures(model_plsa, model_artm)
-#%%
-#comparing Phi & Theta matricies
-
-
-plt.plot(range(model_plsa.num_phi_updates),
-         model_plsa.score_tracker['SparsityPhiScore'].value, 'b--',
-         range(model_artm.num_phi_updates),
-         model_artm.score_tracker['SparsityPhiScore'].value, 'r--', linewidth=2)
-
-plt.xlabel('Iterations count')
-plt.ylabel('PLSA Phi sp. (blue), ARTM Phi sp. (red)')
-plt.grid(True)
-plt.show()
-
-plt.plot(range(model_plsa.num_phi_updates),
-         model_plsa.score_tracker['SparsityThetaScore'].value, 'b--',
-         range(model_artm.num_phi_updates),
-         model_artm.score_tracker['SparsityThetaScore'].value, 'r--', linewidth=2)
-
-plt.xlabel('Iterations count')
-plt.ylabel('PLSA Theta sp. (blue), ARTM Theta sp. (red)')
-plt.grid(True)
-plt.show()
-
-
-#%%
-
-#checking out the sparsity of our matricies
-#print(model_artm.score_tracker["SparsityPhiScore"].last_value)
-#print(model_artm.score_tracker["SparsityThetaScore"].last_value)
-
-print(model_artm.score_tracker["SparsityPhiScore"].last_value)
-print(model_artm.score_tracker["SparsityThetaScore"].last_value)
-
-#checking out topic kernel score
-print(model_artm.score_tracker["TopicKernelScore"])
-
-#print(model_plsa.score_tracker["TopicKernelScore"])
-
-
-
-#checking up the top words
-#print(model_artm.score_tracker["Top_words"])
-#print(model_artm.score_tracker["Top_words"])
-#print(model_artm.)
-
-#%%
-
+top_tokens = model_artm.score_tracker['top_words']
 for topic_name in model_artm.topic_names:
-    print(topic_name + ': '),
-    print(model_artm.score_tracker['TopTokensScore'].last_tokens[topic_name])
-
+    print ('\n',topic_name)
+    for (token, weight) in zip(top_tokens.last_tokens[topic_name][:40],
+                               top_tokens.last_weights[topic_name][:40]):
+        print (token, '-', weight)
+#%%
+artm_phi = model_artm.get_phi()
+artm_theta = model_artm.get_theta()
+#%%
+theta_transposed = artm_theta.transpose()
+theta_texts = pd.concat([df, theta_transposed], axis = 1)
+theta_texts['leading_topic'] = theta_transposed.idxmax(axis=1)
 
 #%%
-artmTokens = model_artm.score_tracker['TopTokensScore'].last_tokens
+import markovify
 #%%
-artmPhi = model_artm.phi_
+
+# simple state markov chain 
+tt  = theta_texts[theta_texts['leading_topic'] == 'topic_32']
+text_model = markovify.Text(tt['text'], state_size= 2 )
+text_model.compile(inplace = True)
+for i in range(5):
+    print(text_model.make_short_sentence(280))
 
 #%%
-artmTokens = pd.DataFrame(artmTokens)
-artmToks= artmTokens.apply(lambda x: ' '.join(x), axis=0)
-artmToks
+# multistate markov chain 
+model_a = markovify.Text(theta_texts[theta_texts['leading_topic'] == 'topic_18']['text'], state_size = 2 )
+model_b = markovify.Text(theta_texts[theta_texts['leading_topic'] == 'topic_25']['text'], state_size= 2)
 
-#%% md
+model_combo = markovify.combine([ model_a, model_b ], [ 1.5, 1 ])
+for i in range(5):
+    print(model_combo.make_sentence())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #%%
 ## KMeans model
