@@ -230,16 +230,20 @@ dictionary.gather(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_c
 dictionary.save_text(dictionary_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_collection_batches/my_dictionary.txt')
 
 #%%
-#intial objects creation
+# intial objects creation
 T=40
 topic_names = ['topic_{}'.format(i) for i in range(T)]
 
 model_artm = artm.ARTM(dictionary = dictionary, topic_names= topic_names, cache_theta= True)
 model_artm.scores.add(artm.PerplexityScore(name='PerplexityScore',dictionary = dictionary))
 model_artm.scores.add(artm.TopTokensScore(name='top_words',num_tokens = 10))
+model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='sparse_phi_regularizer', tau=-0.7,
+                                                            topic_names=topic_names[:35]))
+model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='smooth_phi_regularizer', tau=0.3,
+                                                           topic_names=topic_names[35:]))
 
 #%%
-#initializing the model we've set up
+# initializing the model we've set up
 model_artm.initialize(dictionary)
 model_artm.num_document_passes = 3
 #%%
@@ -259,22 +263,35 @@ import matplotlib.pyplot as plt
 plt.scatter(range(len(perplexityScore)), perplexityScore)
 plt.xlabel('number of iterations')
 plt.ylabel('perplexity score')
-#%%
+# %%
 top_tokens = model_artm.score_tracker['top_words']
 for topic_name in model_artm.topic_names:
     print ('\n',topic_name)
     for (token, weight) in zip(top_tokens.last_tokens[topic_name][:40],
                                top_tokens.last_weights[topic_name][:40]):
         print (token, '-', weight)
-#%%
+# %%
+# extraction of phi and theta to enviroment 
+
 artm_phi = model_artm.get_phi()
 artm_theta = model_artm.get_theta()
-#%%
+# %%
+# transposing theta
+
 theta_transposed = artm_theta.transpose()
 theta_texts = pd.concat([df, theta_transposed], axis = 1)
 theta_texts['leading_topic'] = theta_transposed.idxmax(axis=1)
 
-#%%
+# %%
+# additive regularilazation using BigArtm 
+
+#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='sparse_phi_regularizer', tau=-0.7,
+#                                                            topic_names=topic_names[:35]))
+#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='smooth_phi_regularizer', tau=0.3,
+#                                                           topic_names=topic_names[35:]))
+#model_artm.fit_online(batch_vectorizer=batch_vectorizer, num_collection_passes = 10)
+
+# %%
 import markovify
 #%%
 
@@ -323,7 +340,7 @@ from nltk.corpus import stopwords
 # retrieving text: setting up stop words, making Tf-Idf
 words = stopwords.words('russian')
 vectorizer = TfidfVectorizer(stop_words=words)
-X = vectorizer.fit_transform(df['text'])
+X = vectorizer.fit_transform(theta_transposed)
 
 #%%
 
