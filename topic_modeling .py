@@ -1,4 +1,4 @@
-#%%
+# %%
 # importing the libraries
 # basic stuff
 import pandas as pd
@@ -11,15 +11,13 @@ from nltk.stem import WordNetLemmatizer, PorterStemmer
 from nltk.stem.snowball import SnowballStemmer 
 from nltk.corpus import stopwords
 from tqdm import tqdm
-#%%
+# %%
 # regularization 
 import artm
-
-
 # sklearn
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
@@ -31,27 +29,18 @@ stemmerEn = PorterStemmer()
 
 #%%
 # made data more suitable for json parsing mechanism
-
-
-
 # uploading data
-df0 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/0_28c5a7ee_id-psy_posts.json')
-df1 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/1_18f10508_id-psy_posts.json')
-df2 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/2_8e726921_id-psy_posts.json')
-df3 = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
-#df_test = pd.read_json(r'/Users/apple/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
-#%%
+df0 = pd.read_json(r'~/BDML/id-psy_posts.json/0_28c5a7ee_id-psy_posts.json')
+df1 = pd.read_json(r'~/BDML/id-psy_posts.json/1_18f10508_id-psy_posts.json')
+df2 = pd.read_json(r'~/BDML/id-psy_posts.json/2_8e726921_id-psy_posts.json')
+df3 = pd.read_json(r'~/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
 # alternative
 #df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
 #union all and dropping empty lines 
-df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
+#df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
 df['text'].replace('', np.nan, inplace=True)
 df.dropna(subset=['text'], inplace=True)
 df.reset_index(drop=True, inplace=True)
-
-
-#df_test['text'].replace('', np.nan, inplace=True)
-#df_test.dropna(subset=['text'], inplace=True)
 #%% 
 #defining preprocessing function 
 
@@ -70,14 +59,14 @@ def preprocess(sentence):
     #lemms = [Mystem.lemmatize(str(w)) for w in filtered_words]
     #stem_words=[stemmerEn.stem(w) for w in stem_words]
     return " ".join(filtered_words)
-#%%
+
 # cleaning text
-
-df['text'] = df['text'].map(lambda s:preprocess(s)) 
-df['text'].replace('', np.nan, inplace=True)
-df.dropna(subset=['text'], inplace=True)
+df['clean'] = df['text'].map(lambda s:preprocess(s))
+df.drop(['text'], axis = 1,  inplace = True)
+df.drop_duplicates(inplace=True)
+df.index.is_unique
+df.dropna(subset=['clean'], inplace=True)
 df.reset_index(drop=True, inplace=True)
-
 #%%
 # creating the function for transformation to vowpal_wabbit format
 
@@ -111,28 +100,22 @@ def df_to_vw_regression(df, filepath='in.txt', columns=None, target=None, namesp
             f.write('\n')
 
 
-#%%
 # changing the type of data created
 
 #vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',  target = 'owner_id')
 
 #%%
 # batching data for applying it to our model
-#batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',
-#                                        data_format='vowpal_wabbit',
-#                                        collection_name= 'vw',
-#                                        target_folder='my_collection_batches')
+batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',
+                                        data_format='vowpal_wabbit',
+                                        collection_name= 'vw',
+                                        target_folder='my_collection_batches')
 
-batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_collection_batches',
-                                        data_format='batches')
-
-#%% md
-
-# LDA (BigARTM package) Model
-
+#batch_vectorizer = artm.BatchVectorizer(data_path='/Users/apple/BDML/topic_modeling/TopicModeling/my_collection_batches',
+#                                        data_format='batches')
 #%%
+# LDA (BigARTM package) Model
 # setting up lda parameters
-
 
 lda = artm.LDA(num_topics=20,
                alpha=0.001, beta=0.019,
@@ -140,11 +123,8 @@ lda = artm.LDA(num_topics=20,
                num_document_passes=5,
                dictionary=batch_vectorizer.dictionary)
 
-
-
 #Phi is the ‘parts-versus-topics’ matrix, and theta is the ‘composites-versus-topics’ matrix
 lda.fit_offline(batch_vectorizer=batch_vectorizer, num_collection_passes=1)
-
 
 #checking up the parametrs of the matricies
 lda.sparsity_phi_last_value
@@ -152,7 +132,6 @@ lda.sparsity_theta_last_value
 lda.perplexity_last_value
 
 #%%
-
 
 #top tokens for each class of all the clusters we've got
 top_tokens = lda.get_top_tokens(num_tokens=10)
@@ -197,11 +176,9 @@ f_names = pd.DataFrame(feature_names)
 lda_skl_phi = pd.concat([ f_names, phi_numbers], axis=1)
 #%%
 # concating initial dataset with topics
-
 messages_topics = pd.concat([df, X_topics], axis = 1)
 
 # adding leading topic
-
 messages_topics['leading_topic'] = X_topics.idxmax(axis=1)
 #%%
 import markovify
@@ -280,16 +257,190 @@ artm_theta = model_artm.get_theta()
 
 theta_transposed = artm_theta.transpose()
 theta_texts = pd.concat([df, theta_transposed], axis = 1)
-theta_texts['leading_topic'] = theta_transposed.idxmax(axis=1)
-
 # %%
-# additive regularilazation using BigArtm 
+# aglomerative clustering 
+model = AgglomerativeClustering(n_clusters=16, affinity='euclidean', linkage='ward')
+model.fit(theta_transposed)
+labels = model.labels_
+# %%
+theta_transposed['labels'] = labels
+#theta_texts['leading_topic'] = theta_transposed.idxmax(axis=1)
 
-#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='sparse_phi_regularizer', tau=-0.7,
-#                                                            topic_names=topic_names[:35]))
-#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='smooth_phi_regularizer', tau=0.3,
-#                                                           topic_names=topic_names[35:]))
-#model_artm.fit_online(batch_vectorizer=batch_vectorizer, num_collection_passes = 10)
+df['label'] = labels
+merged = df.merge(initial_text, left_on='clean', right_on = 'clean',left_index=True )
+# Checkpoint
+
+file1 = open("myfile.txt","w")
+
+for i in merged[ merged['label'] == 1]['text']:
+    file1.write(i+'. \n')
+#file1.writelines(df[df['label'] == 3]['clean']) 
+
+file1.close() 
+# %%
+
+# starting pytorch 
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import numpy as np
+from collections import Counter
+import os
+from argparse import Namespace
+
+
+flags = Namespace(
+    train_file='myfile.txt',
+    seq_size=32,
+    batch_size=16,
+    embedding_size=64,
+    lstm_size=64,
+    gradients_norm=5,
+    initial_words=['просто'],
+    predict_top_k=5,
+    checkpoint_path='checkpoint',
+)
+
+def get_data_from_file(train_file, batch_size, seq_size):
+    with open(train_file, 'r') as f:
+        text = f.read()
+    text = text.split()
+
+    word_counts = Counter(text)
+    sorted_vocab = sorted(word_counts, key=word_counts.get, reverse=True)
+    int_to_vocab = {k: w for k, w in enumerate(sorted_vocab)}
+    vocab_to_int = {w: k for k, w in int_to_vocab.items()}
+    n_vocab = len(int_to_vocab)
+
+    print('Vocabulary size', n_vocab)
+
+    int_text = [vocab_to_int[w] for w in text]
+    num_batches = int(len(int_text) / (seq_size * batch_size))
+    in_text = int_text[:num_batches * batch_size * seq_size]
+    out_text = np.zeros_like(in_text)
+    out_text[:-1] = in_text[1:]
+    out_text[-1] = in_text[0]
+    in_text = np.reshape(in_text, (batch_size, -1))
+    out_text = np.reshape(out_text, (batch_size, -1))
+    return int_to_vocab, vocab_to_int, n_vocab, in_text, out_text
+
+def get_batches(in_text, out_text, batch_size, seq_size):
+    num_batches = np.prod(in_text.shape) // (seq_size * batch_size)
+    for i in range(0, num_batches * seq_size, seq_size):
+        yield in_text[:, i:i+seq_size], out_text[:, i:i+seq_size]
+
+class RNNModule(nn.Module):
+    def __init__(self, n_vocab, seq_size, embedding_size, lstm_size):
+        super(RNNModule, self).__init__()
+        self.seq_size = seq_size
+        self.lstm_size = lstm_size
+        self.embedding = nn.Embedding(n_vocab, embedding_size)
+        self.lstm = nn.LSTM(embedding_size,
+                            lstm_size,
+                            batch_first=True)
+        self.dense = nn.Linear(lstm_size, n_vocab)
+    def forward(self, x, prev_state):
+        embed = self.embedding(x)
+        output, state = self.lstm(embed, prev_state)
+        logits = self.dense(output)
+
+        return logits, state
+    def zero_state(self, batch_size):
+        return (torch.zeros(1, batch_size, self.lstm_size),
+                torch.zeros(1, batch_size, self.lstm_size))
+def get_loss_and_train_op(net, lr=0.001):
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+
+    return criterion, optimizer
+
+def main():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    int_to_vocab, vocab_to_int, n_vocab, in_text, out_text = get_data_from_file(
+        flags.train_file, flags.batch_size, flags.seq_size)
+
+    net = RNNModule(n_vocab, flags.seq_size,
+                    flags.embedding_size, flags.lstm_size)
+    net = net.to(device)
+
+    criterion, optimizer = get_loss_and_train_op(net, 0.01)
+
+    iteration = 0
+    for e in range(50):
+        batches = get_batches(in_text, out_text, flags.batch_size, flags.seq_size)
+        state_h, state_c = net.zero_state(flags.batch_size)
+        
+        # Transfer data to GPU
+        state_h = state_h.to(device)
+        state_c = state_c.to(device)
+        for x, y in batches:
+            iteration += 1
+            
+            # Tell it we are in training mode
+            net.train()
+
+            # Reset all gradients
+            optimizer.zero_grad()
+
+            # Transfer data to GPU
+            x = torch.tensor(x).to(device)
+            y = torch.tensor(y).to(device)
+
+            logits, (state_h, state_c) = net(x, (state_h, state_c))
+            loss = criterion(logits.transpose(1, 2), y)
+
+            state_h = state_h.detach()
+            state_c = state_c.detach()
+
+            loss_value = loss.item()
+
+            # Perform back-propagation
+            loss.backward()
+
+            _ = torch.nn.utils.clip_grad_norm_(
+                net.parameters(), flags.gradients_norm)
+            # Update the network's parameters
+            optimizer.step()
+            if iteration % 100 == 0:
+                print('Epoch: {}/{}'.format(e, 200),
+                      'Iteration: {}'.format(iteration),
+                      'Loss: {}'.format(loss_value))
+
+            if iteration % 300 == 0:
+                predict(device, net, flags.initial_words, n_vocab,
+                        vocab_to_int, int_to_vocab, top_k=5)
+
+def predict(device, net, words, n_vocab, vocab_to_int, int_to_vocab, top_k=5):
+    net.eval()
+
+    state_h, state_c = net.zero_state(1)
+    state_h = state_h.to(device)
+    state_c = state_c.to(device)
+    for w in words:
+        ix = torch.tensor([[vocab_to_int[w]]]).to(device)
+        output, (state_h, state_c) = net(ix, (state_h, state_c))
+    
+    _, top_ix = torch.topk(output[0], k=top_k)
+    choices = top_ix.tolist()
+    choice = np.random.choice(choices[0])
+
+    words.append(int_to_vocab[choice])
+    for _ in range(100):
+        ix = torch.tensor([[choice]]).to(device)
+        output, (state_h, state_c) = net(ix, (state_h, state_c))
+
+        _, top_ix = torch.topk(output[0], k=top_k)
+        choices = top_ix.tolist()
+        choice = np.random.choice(choices[0])
+        words.append(int_to_vocab[choice])
+
+    print(' '.join(words))
+    
+if __name__ == '__main__':
+    main()
+# %%
 
 # %%
 import markovify
@@ -326,53 +477,6 @@ for i in range(5):
 
 
 
-#%%
-## KMeans model
-
-#%%
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
-from nltk.corpus import stopwords
-
-#%%
-
-# retrieving text: setting up stop words, making Tf-Idf
-words = stopwords.words('russian')
-vectorizer = TfidfVectorizer(stop_words=words)
-X = vectorizer.fit_transform(theta_transposed)
-
-#%%
-
-# counting KMeans for 13 clusters and fitting vectorized data in to the model
-true_k = 18
-model = KMeans(n_clusters=true_k, init='k-means++', max_iter=100, n_init=10)
-model.fit(X)
-
-#%%
-
-#figuring out centroids for our data
-order_centroids = model.cluster_centers_.argsort()[:, ::-1]
-terms = vectorizer.get_feature_names()
-centers = model.cluster_centers_
-
-#%%
-
-for i in range(true_k):
-    print('Cluster %d:' % i),
-    for ind in order_centroids[i, :300]:
-        print(' %s' % terms[ind])
-
-#%%
-
-kdf = pd.DataFrame(
-    [i,  terms[ind]]
-    for i in range(true_k)
-    for ind in order_centroids[i, :30]).groupby([0])[1].transform(lambda x: ' '.join(x)).drop_duplicates()
-
-#%%
-
-print(kdf)
 
 #%% md
 
@@ -393,8 +497,6 @@ warnings.filterwarnings('ignore')
 
 #%%
 
-#importing more libraries
-#import math
 
 #downloading te right vocabulaty
 from deeppavlov.models.preprocessors.bert_preprocessor import BertPreprocessor
@@ -462,163 +564,4 @@ tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_PATH, cache_dir=None, do_lo
 #%%
 
 encoder = downloaded.bert
-
-#%%
-
-#working summarizer
-
-#needs customization:
-# 1) adding Rus from spacy
-# 2) adding multilang bert to bertParent
-# 3) changing model and language all over the preproccessing file
-from summarizer import Summarizer
-model = Summarizer()
-
-#%%
-
-body = '''
-🏅Главная тема. 
-Комитет ВАДА рекомендовал максимально жестко наказать Россию за обнаруженные недавно манипуляции с базой данных Московской антидопинговой лаборатории: 
-отстранить от Олимпийских и Паралимпийских игр и чемпионатов мира по всем видам спорта (футбол тоже считается, ага) 
-на четыре года, а также запретить принимать любые международные соревнования. 
-Пока это лишь рекомендации — окончательное решение должен принять исполком ВАДА 9 декабря. 
-Надежд, прямо скажем, почти никаких: МОК уже поддержал введение «самых жестких санкций». 
-
-🎯Нерегулярная армейская рубрика «Кто бросил валенок на пульт».
-Суд взыскал 31 миллион рублей с двух военнослужащих Черноморского флота, которые случайно запустили авиационную ракету «воздух — поверхность».
-Инцидент произошел еще в 2017 году, при полете ракета снесла ворота и часть стены ангара и уничтожила различное оборудование и еще одну ракету. 
-'''
-
-
-result = model(body, min_length=60, max_length = 500)
-full = ''.join(result)
-print(full)
-
-#%%
-
-#working summarizer
-text = body
-
-from summa import keywords
-lables = keywords.keywords(text, language = 'russian',ratio = 0.02, scores = False)
-print(lables)
-
-#%%
-
-from summa import summarizer
-sumar = summarizer.summarize(text)
-print(sumar)
-
-#%% md
-
-# TFIDF Classifier based on LentaRu dataset
-
-#%%
-
-# uploading data
-lentaRu = pd.read_csv(r'/Users/apple/Downloads/lenta-ru-news.csv')
-lentaRuTxt = lentaRu['text']
-lentaRu.info()
-
-# importing all libraries needed
-import numpy as np
-import re
-from nltk.corpus import stopwords
-from nltk.stem import SnowballStemmer
-
-#scikit
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import LinearSVC
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.feature_selection import SelectKBest, chi2
-
-#defining classes stemmer and stop words
-stemmer = SnowballStemmer('russian')
-words = stopwords.words('russian')
-
-#%%
-
-#cleaning the data from odd symbols, stand alone letters
-#lowercasing every document
-lentaRu['cleaned'] = lentaRu['text'].apply(lambda x: " ".join([stemmer.stem(i) for i in re.sub("[^а-яА-Я]",
-                                                                                               " ",
-                                                                                               str(x)).split() if i not in words]).lower())
-#checking out if any cell is NA
-lentaRu.isna()
-
-#%%
-
-#getting rid of NAs
-lentaRuWon = lentaRu.dropna()
-lentaRuWon
-print(lentaRuWon['tags'].unique())
-print(lentaRuWon['topic'].unique())
-
-#%%
-
-#partitioning the data in to test and train frames
-X_train, X_test, y_train, y_test = train_test_split(lentaRuWon['cleaned'],
-                                                    lentaRuWon.topic,
-                                                    test_size=0.05)
-
-#%%
-
-#creating pipeline
-#create TFIDF vector for single words and bigrams
-#selecting only good features for our vector
-#choosing SVC algorithm
-pipeline = Pipeline([('vect', TfidfVectorizer(ngram_range=(1, 2), stop_words=words, sublinear_tf=True)),
-                     ('chi',  SelectKBest(chi2, k=10000)),
-                     ('clf', LinearSVC(C=1.0, penalty='l1', max_iter=3000, dual=False))])
-
-#%%
-
-#fitting the model into the pipeliine
-model = pipeline.fit(X_train, y_train)
-
-#%%
-
-#preparation
-#getting instances
-vectorizer = model.named_steps['vect']
-chi = model.named_steps['chi']
-clf = model.named_steps['clf']
-#transforming features
-feature_names = vectorizer.get_feature_names()
-feature_names = [feature_names[i] for i in chi.get_support(indices=True)]
-feature_names = np.asarray(feature_names)
-
-#%%
-
-#checking out accuracy score of the model
-print("accuracy score: " + str(model.score(X_test, y_test)))
-#accuracy score: 0.8038830593120476
-
-
-
-#import dill as pickle
-
-#with open('testing_model.pk', 'wb') as file:
-#    pickle.dump(model, file)
-#with open('testing_model.pk','rb') as f:
-#    model = pickle.load(f)
-
-
-#%%
-
-lda_predict = model.predict(top_tokens_vec)
-lda_predict = pd.DataFrame(lda_predict)
-lda_result = pd.concat([top_tokens_vec, lda_predict], axis=1)
-print(lda_result)
-
-#%%
-
-artm_predict = model.predict(artmToks)
-artm_predict = pd.DataFrame(artm_predict)
-artm_result = pd.concat([artmToks, artm_predict], axis=1)
-print(artm_result)
-
-#%%
-
 
