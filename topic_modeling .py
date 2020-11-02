@@ -21,7 +21,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
-#from pymystem3 import Mystem
+from pymystem3 import Mystem
 
 # nltk stemmers
 stemmerRu = SnowballStemmer("russian") 
@@ -37,7 +37,7 @@ df3 = pd.read_json(r'~/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
 # alternative
 #df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
 #union all and dropping empty lines 
-#df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
+df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
 df['text'].replace('', np.nan, inplace=True)
 df.dropna(subset=['text'], inplace=True)
 df.reset_index(drop=True, inplace=True)
@@ -55,10 +55,10 @@ def preprocess(sentence):
     tokenizer = RegexpTokenizer(r'\w+')
     tokens = tokenizer.tokenize(rem_num)  
     filtered_words = [w for w in tokens if len(w) > 2 if not w in stopwords.words('russian')]
-    #stem_words=[stemmerRu.stem(w) for w in filtered_words]
-    #lemms = [Mystem.lemmatize(str(w)) for w in filtered_words]
+    stem_words=[stemmerRu.stem(w) for w in filtered_words]
+    #lemms = [Mystem().lemmatize(str(w)) for w in filtered_words]
     #stem_words=[stemmerEn.stem(w) for w in stem_words]
-    return " ".join(filtered_words)
+    return " ".join(stem_words)
 
 # cleaning text
 df['clean'] = df['text'].map(lambda s:preprocess(s))
@@ -102,7 +102,7 @@ def df_to_vw_regression(df, filepath='in.txt', columns=None, target=None, namesp
 
 # changing the type of data created
 
-#vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',  target = 'owner_id')
+vw = df_to_vw_regression(df, filepath='/Users/apple/BDML/topic_modeling/TopicModeling/data.txt',  target = 'owner_id')
 
 #%%
 # batching data for applying it to our model
@@ -214,10 +214,10 @@ topic_names = ['topic_{}'.format(i) for i in range(T)]
 model_artm = artm.ARTM(dictionary = dictionary, topic_names= topic_names, cache_theta= True)
 model_artm.scores.add(artm.PerplexityScore(name='PerplexityScore',dictionary = dictionary))
 model_artm.scores.add(artm.TopTokensScore(name='top_words',num_tokens = 10))
-model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='sparse_phi_regularizer', tau=-0.7,
-                                                            topic_names=topic_names[:35]))
+#model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='sparse_phi_regularizer', tau=-0.7,
+#                                                            topic_names=topic_names[:35]))
 model_artm.regularizers.add(artm.SmoothSparsePhiRegularizer(name='smooth_phi_regularizer', tau=0.3,
-                                                           topic_names=topic_names[35:]))
+                                                           topic_names=topic_names))#[35:]))
 
 #%%
 # initializing the model we've set up
@@ -249,25 +249,38 @@ for topic_name in model_artm.topic_names:
         print (token, '-', weight)
 # %%
 # extraction of phi and theta to enviroment 
-
-artm_phi = model_artm.get_phi()
+#artm_phi = model_artm.get_phi()
 artm_theta = model_artm.get_theta()
-# %%
+
 # transposing theta
 
 theta_transposed = artm_theta.transpose()
 theta_texts = pd.concat([df, theta_transposed], axis = 1)
 # %%
 # aglomerative clustering 
-model = AgglomerativeClustering(n_clusters=16, affinity='euclidean', linkage='ward')
+n_clusters = 15
+model = AgglomerativeClustering(n_clusters=n_clusters, affinity='euclidean', linkage='ward')
 model.fit(theta_transposed)
 labels = model.labels_
 # %%
 theta_transposed['labels'] = labels
 #theta_texts['leading_topic'] = theta_transposed.idxmax(axis=1)
-
 df['label'] = labels
-merged = df.merge(initial_text, left_on='clean', right_on = 'clean',left_index=True )
+#merged = df.merge(initial_text, left_on='clean', right_on = 'clean',left_index=True )
+
+#%%
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy import stats
+for i in range(n_clusters):
+    #sns.set(color_codes=True)
+    #sns.distplot(theta_transposed[theta_transposed['labels'] == i].drop(['labels'], axis = 1).mean())
+    plt.plot(theta_transposed[theta_transposed['labels'] == i].drop(['labels'], axis = 1).mean(),label = i)
+    
+#%%
+#sns.distplot(theta_transposed[theta_transposed['labels'] == 4].drop(['labels'], axis = 1).mean())
+plt.plot(theta_transposed[theta_transposed['labels'] == 14].drop(['labels'], axis = 1).mean())
+#%%
 # Checkpoint
 
 file1 = open("myfile.txt","w")
