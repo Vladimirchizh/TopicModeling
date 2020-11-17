@@ -30,18 +30,13 @@ stemmerEn = PorterStemmer()
 #%%
 # made data more suitable for json parsing mechanism
 # uploading data
-df0 = pd.read_json(r'~/BDML/id-psy_posts.json/0_28c5a7ee_id-psy_posts.json')
-df1 = pd.read_json(r'~/BDML/id-psy_posts.json/1_18f10508_id-psy_posts.json')
-df2 = pd.read_json(r'~/BDML/id-psy_posts.json/2_8e726921_id-psy_posts.json')
-df3 = pd.read_json(r'~/BDML/id-psy_posts.json/3_a5e719df_id-psy_posts.json')
-# alternative
-df = pd.read_csv(r'/Users/apple/BDML/НИР/train.csv')
-# %%
+
+df = pd.read_csv(r'/Users/apple/BDML/topic_modeling/TopicModeling/group_user.csv')
 #union all and dropping empty lines 
-df = pd.concat([df0[['text', 'owner_id']], df1[['text', 'owner_id']], df2[['text', 'owner_id']], df3[['text', 'owner_id']]])
-df['text'].replace('', np.nan, inplace=True)
-df.dropna(subset=['text'], inplace=True)
-df.reset_index(drop=True, inplace=True)
+df2 = pd.read_csv(r'/Users/apple/BDML/topic_modeling/TopicModeling/vk_profiles.csv')
+#df['text'].replace('', np.nan, inplace=True)
+#df.dropna(subset=['text'], inplace=True)
+#df.reset_index(drop=True, inplace=True)
 #%% 
 #defining preprocessing function 
 
