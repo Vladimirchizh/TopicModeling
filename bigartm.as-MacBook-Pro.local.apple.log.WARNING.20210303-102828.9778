@@ -1,0 +1,5 @@
+Log file created at: 2021/03/03 10:28:28
+Running on machine: as-MacBook-Pro.local
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+W0303 10:28:28.690181 238820864 check_messages.h:1121] Inconsistent fields size in ThetaMatrix: 6426493 vs 0 vs 6426493 vs 0;
+W0303 10:29:18.649672 238820864 check_messages.h:1121] Inconsistent fields size in ThetaMatrix: 6426493 vs 0 vs 6426493 vs 0;
