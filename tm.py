@@ -2,6 +2,8 @@
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
 import pandas as pd
+import markovify as markov_chain
+
 # %%
 #uploading data needed
 df = pd.read_parquet(r'/Users/apple/BDML/topic_modeling/theta_transposed_ND_big_clean.parquet.gzip')
@@ -14,7 +16,8 @@ print(df.columns)
 
 # %%
 
-data_topic = 'авто автомобиль машина добавлять'
+# choosing topic
+data_topic = 'игра команда'
 
 a = pd.DataFrame()
 a['theme'] = df.drop(columns = ['text', 'owner_id']) \
@@ -31,17 +34,21 @@ a = a.loc[a['theme'] == data_topic ] \
 
 # %%
 
+# taking top 25% of the topic data
 a = a.loc[a['coef'] < 0.95].head(round(len(a)*0.25))
-#a = a.iloc[200:].reset_index(drop = True)
-#a = a[a['text'].str.contains('iphone')]
+# a = a.loc[a['coef'] < 0.95].head(25000)
+#a = a[a['text'].str.contains('')]
+
 # %%
 
+# filtering russian language
 import langid
 a['lang'] = a['text'].map(lambda s:langid.classify(s))
 a = a[a['lang'].str.contains('ru', regex = False) == True]
 a = a.drop(['lang'], axis = 1)
 print(a.head())
 # %%
+# saving the samples 
 file_test = open("test.txt","w")
 file_train = open('train.txt', "w")
 
@@ -53,4 +60,44 @@ for i in a.tail(round(len(a)*0.2))['text']:
 file_test.close() 
 # %%
 #a.to_csv('~/BDML/topic_modeling/posts.csv')
+
+
+
+
+
+# %%
+
+
+
+
+# creating markov chains for every topic in the dataset 
+temp = pd.DataFrame()
+temp['theme'] = df.drop(columns = ['text', 'owner_id']) \
+    .idxmax(axis=1)
+
+temp['text'] = df['text']
+a = a
+
+for n in df.columns:
+
+  print(n)
+  d = temp
+  d['coef'] = df[n]
+  d = d.drop_duplicates(subset = 'text') \
+    .sort_values('coef', ascending=False) \
+    .reset_index(drop = True) \
+    .loc[d['coef'] < 0.95].head(5000)
+  
+  d['lang'] = d['text'].map(lambda s:langid.classify(s))
+  d = d[d['lang'].str.contains('ru', regex = False) == True]
+  d = d.drop(['lang'], axis = 1)   
+
+  text_model = markov_chain \
+      .Text(d[d['theme'] == n]['text'], state_size= 2, well_formed= True)
+
+  text_model.compile(inplace = True)
+  for i in range(4):
+    print(text_model.make_short_sentence(160))
+
+
 # %%
