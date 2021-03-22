@@ -6,18 +6,22 @@ import markovify as markov_chain
 
 # %%
 #uploading data needed
-df = pd.read_parquet(r'/Users/apple/BDML/topic_modeling/theta_transposed_ND_big_clean.parquet.gzip')
+df = pd.read_parquet(r'/Users/apple/BDML/topic_modeling/TopicModeling/theta_transposed_сс_rus.parquet.gzip')
 
 #df['text'].replace('', np.nan, inplace=True)
 
 # %%
 print(df.columns)
 
-
+# %% 
+df['length'] = df.text.str.len()
+df = df.loc[df['length'] > 70]
+df.drop(columns = ['length'], inplace=True)
+len(df)
 # %%
 
 # choosing topic
-data_topic = 'игра команда'
+data_topic = 'фото фотография шоу фотограф свадьба'
 
 a = pd.DataFrame()
 a['theme'] = df.drop(columns = ['text', 'owner_id']) \
@@ -35,18 +39,9 @@ a = a.loc[a['theme'] == data_topic ] \
 # %%
 
 # taking top 25% of the topic data
-a = a.loc[a['coef'] < 0.95].head(round(len(a)*0.25))
-# a = a.loc[a['coef'] < 0.95].head(25000)
-#a = a[a['text'].str.contains('')]
+#a = a.loc[a['coef'] < 0.95].head(round(len(a)*0.25))
+a = a.loc[a['coef'] < 0.95].head(30000)
 
-# %%
-
-# filtering russian language
-import langid
-a['lang'] = a['text'].map(lambda s:langid.classify(s))
-a = a[a['lang'].str.contains('ru', regex = False) == True]
-a = a.drop(['lang'], axis = 1)
-print(a.head())
 # %%
 # saving the samples 
 file_test = open("test.txt","w")
