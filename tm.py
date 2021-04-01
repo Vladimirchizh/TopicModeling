@@ -7,13 +7,27 @@ import markovify as markov_chain
 
 # %%
 # uploading data needed
-df = pd.read_parquet(r'/Users/apple/BDML/topic_modeling/theta_transposed_ND_big_clean.parquet.gzip')
-
-# df['text'].replace('', np.nan, inplace=True)
+df = pd.read_parquet(r'theta_transposed_сс_rus.parquet.gzip',columns =lst)
 
 # %%
+# df['text'].replace('', np.nan, inplace=True)
+# df.drop(columns=['text'], inplace=True)
 
-lst = df.columns[:len(df.columns)-2]
+# %% text
+initial_text = pd.read_csv(r'/Users/apple/BDML/data/group_posts_divide_by_posts.csv')
+
+# %%
+initial_text.dropna(subset=['text'], inplace=True)
+# %%
+initial_text.drop_duplicates(subset='text', inplace=True)
+
+# %%
+initial_text = initial_text \
+    .groupby('owner_id')['text'] \
+    .transform(lambda x: ' '.join(x))
+# %%
+
+lst = df.columns[:len(df.columns)-1]
 
 print(lst)
 
@@ -25,7 +39,7 @@ len(df)
 # %%
 
 # choosing topic
-data_topic = 'век церковь храм день город'
+data_topic = 'лук перец соль сыр салат вкус'
 
 a = pd.DataFrame()
 a['theme'] = df.drop(columns=['text', 'owner_id']) \
