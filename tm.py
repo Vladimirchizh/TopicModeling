@@ -7,8 +7,8 @@ from sklearn.model_selection import train_test_split
 
 # %%
 # uploading data needed
-df = pd.read_parquet(r'theta_transposed_сс_rus.parquet.gzip')
-df.drop(columns=['text'], inplace=True)
+df = pd.read_parquet(r'/Users/apple/BDML/data/theta_transposed_сс_rus.parquet.gzip')
+#df.drop(columns=['text'], inplace=True)
 
 # %%
 # text: raw before concatination
@@ -22,48 +22,29 @@ lst = df.columns[:len(df.columns)-2]
 print(lst)
 
 # %% 
-df['length'] = df.text.str.len()
-df = df.loc[df['length'] > 100]
-df.drop(columns=['length'], inplace=True)
-len(df)
-# %%
+import os
+def create_dir(dir):
+  if not os.path.exists(dir):
+    os.makedirs(dir)
+    print("Created Directory : ", dir)
+  else:
+    print("Directory already existed : ", dir)
+  return dir
 
-# choosing topic
 
-data_topic =   'игра матч футбол команда мир'
-a = pd.DataFrame()
-a['theme'] = df.drop(columns=['text', 'owner_id']) \
-    .idxmax(axis=1)
+def fix_length(df, length = 100):
+    df['length'] = df.text.str.len()
+    df = df.loc[df['length'] > length]
+    df.drop(columns=['length'], inplace=True)
+    len(df)
+    return df
 
-# a['text'] = df['text']
-a['owner_id'] = df['owner_id']
-a['coef'] = df[data_topic]
-a = a.loc[a['theme'] == data_topic] \
-    .drop(columns=['theme']) \
-    .sort_values('coef', ascending=False) \
-    .reset_index(drop=True)
 
-# taking top 25% of the topic data
-# a = a.loc[a['coef'] < 0.95].head(round(len(a)*0.25))
-a = a.loc[a['coef'] < 0.95]  # .head(40000)
-a = a.loc[a['coef'] > 0.65]
+def cleanhtml(raw_html):
+  cleanr = re.compile('<.*?>')
+  cleantext = re.sub(cleanr, '', raw_html)
+  return cleantext
 
-a = a.merge(initial_text,
-            how='left',
-            on=['owner_id'])
-
-# %%
-a.drop_duplicates(subset='text', inplace = True)
-df_sample = a.sample(frac=1).reset_index(drop=True)
-
-test_data = df_sample.text[:round(len(df_sample) / 4)]
-train_data = df_sample.text[round(len(df_sample) / 4):]
-# %%
-
-train_test_ratio = 0.9
-train_valid_ratio = 7 / 9
-#df_full_train, df_test = train_test_split(a, train_size=train_test_ratio, random_state=1)
-df_train, df_valid = train_test_split(a, train_size=train_valid_ratio, random_state=1)
 
 
 
@@ -79,11 +60,47 @@ def build_dataset(df, dest_path):
         data += bos_token + ' ' + summary + ' ' + eos_token + '\n'
 
     f.write(data)
+# %%
 
+# choosing topic
+
+data_topic =  'игра команда место'
+a = pd.DataFrame()
+a['theme'] = df.drop(columns=['owner_id']) \
+    .idxmax(axis=1)
+
+# a['text'] = df['text']
+a['owner_id'] = df['owner_id']
+a['coef'] = df[data_topic]
+a = a.loc[a['theme'] == data_topic] \
+    .drop(columns=['theme']) \
+    .sort_values('coef', ascending=False) \
+    .reset_index(drop=True)
+
+# taking top 25% of the topic data
+# a = a.loc[a['coef'] < 0.95].head(round(len(a)*0.25))
+a = a.loc[a['coef'] < 0.95]  # .head(40000)
+a = a.loc[a['coef'] > 0.65]
+
+# %%
+# a = a.merge(initial_text,how='left', on=['owner_id'])
+# a = fix_length(a, 100)
+# a.drop_duplicates(inplace = True)
+# a['text'] = a['text'].apply(lambda x: cleanhtml(x))
+# a = fix_length(a, 100)
+# a.drop_duplicates(inplace = True)
+# %%
+df_sample = a.sample(frac=1).reset_index(drop=True)
+
+test_data = df_sample.text[:round(len(df_sample) / 4)]
+train_data = df_sample.text[round(len(df_sample) / 4):]
+# %%
+
+train_valid_ratio = 7 / 9
+df_train, df_valid = train_test_split(a, train_size=train_valid_ratio, random_state=1)
 
 build_dataset(df_train, 'train.txt')
 build_dataset(df_valid, 'validation.txt')
-#build_dataset(df_test, 'test.txt')
 
 
 
@@ -108,30 +125,36 @@ file_test.close()
 
 # %%
 
-train_test_ratio = 0.9
 train_valid_ratio = 7 / 9
 
 dataframes = dict()
 temp = pd.DataFrame()
 temp['theme'] = df.drop(columns=['text', 'owner_id']) \
     .idxmax(axis=1)
+
 temp['text'] = df['text']
 
 for n in lst:
     print(n)
+    create_dir('pre_gpt/'+n)
     dataframes[n] = temp
     dataframes[n]['coef'] = df[n]
 
     dataframes[n] = dataframes[n].loc[dataframes[n]['coef'] < 0.95] \
-        .loc[dataframes[n]['coef'] > 0.80] \
+        .loc[dataframes[n]['coef'] > 0.65] \
         .drop_duplicates(subset='text') \
         .sort_values('coef', ascending=False) \
         .reset_index(drop=True)
+    
     df_train, df_valid = train_test_split(dataframes[n],
                                           train_size=train_valid_ratio,
                                           random_state=1)
     build_dataset(df_train, 'pre_gpt/'+n+'/train.txt')
     build_dataset(df_valid, 'pre_gpt/'+n+'/validation.txt')
+
+
+
+    
 # %%
 
 file_multitrain = open('multitrain.txt', "w")
