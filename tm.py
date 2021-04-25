@@ -94,23 +94,6 @@ df_sample = a.sample(frac=1).reset_index(drop=True)
 
 test_data = df_sample.text[:round(len(df_sample) / 4)]
 train_data = df_sample.text[round(len(df_sample) / 4):]
-# %%
-
-train_valid_ratio = 7 / 9
-df_train, df_valid = train_test_split(a, train_size=train_valid_ratio, random_state=1)
-
-build_dataset(df_train, 'train.txt')
-build_dataset(df_valid, 'validation.txt')
-
-
-
-
-
-
-
-
-
-# %%
 
 # saving the samples 
 file_test = open("validation.txt", "w")
@@ -124,6 +107,20 @@ for i in test_data:
 file_test.close()
 
 # %%
+
+train_valid_ratio = 7 / 9
+df_train, df_valid = train_test_split(a, train_size=train_valid_ratio, random_state=1)
+
+build_dataset(df_train, 'train.txt')
+build_dataset(df_valid, 'validation.txt')
+
+
+
+
+
+# %%
+
+# saving into the tree of the datasets
 
 train_valid_ratio = 7 / 9
 
@@ -154,8 +151,10 @@ for n in lst:
 
 
 
-    
+
 # %%
+
+# saving as the single file
 
 file_multitrain = open('multitrain.txt', "w")
 for d in dataframes.values():
