@@ -18,6 +18,7 @@ dresses = ['размер', 'платье', 'наличие', 'ткань']
 handmade = ['ряд', 'handmade', 'ручнаяработа' ]
 massage = ['массаж', 'семинар', 'релакс']
 music_consert = ['группа','концерт','альбом','песня','рок']
+parenting = ['ребенок', 'родитель']
 photo = ['фото', 'фотография', 'шоу', 'фотограф', 'свадьба']
 renovation = ['дома', 'ремонт', 'работа', 'монтаж']
 series = ['фильм', 'серия', 'кино']
@@ -28,9 +29,8 @@ sport = ['футбол','матч','сегодня','победа']
 
 data_samples = {
 
-    .25:'art',
-    .15:'photo',
-    .14:'dresses'
+    .6: 'cost_vacations'
+    #.6: 'series'
 
     }
 
@@ -46,7 +46,7 @@ for i in data_samples.values():
   
   representations = open('models/%s/representations.txt'%i, "w")
 
-  for a in range(round(30*keys[vals.index(i)])):
+  for a in range(round(10*keys[vals.index(i)])):
     print('sample: ',a, 'message')
     text = "<BOS> "+random.choice(eval(i))
     inpt = tok.encode(text, return_tensors="pt")
@@ -55,8 +55,9 @@ for i in data_samples.values():
                        do_sample=True, top_k=5, 
                        top_p=0.95, temperature=1)
     
-    
     f_text = re.sub('expand text','',re.sub(r'(?:\s)<[^, ]*', '',  tok.decode(out[0])))
     print(f_text)
-  representations.write(f_text + '. \n')
+    representations.write(f_text + '. \n')
+    
+  representations.close()
 
