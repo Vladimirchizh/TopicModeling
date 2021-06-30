@@ -1,5 +1,5 @@
 # Text data anonymization of social network users based on vector representations of their interests
-Main target of the research is to provide text generation based on the topics representations to ensure high-quality anonymization of personal texts while maintaining the distribution of interests of the initial data.
+Main target of the research was to provide text generation based on the topics representations to ensure high-quality anonymization of personal texts while maintaining the distribution of interests of the initial data.
 The objectives of the study are 
 - to try out different methods of topic modeling and labeling of the dataset and look through the quality of their results; 
 - segmentation of the users according to their topics’ representation and demographic data; creating of new representations and imbedding it into the text generation pipeline.; 
@@ -40,7 +40,7 @@ To generate differentialy private datasets I used pre-treained network: [![Open 
 
 The example of differetialy private social media feed which was created using the given algorithm.
 
-<img src="pictures/user.png" width="100%"/>(*The mean results for demographic groups.*)
+<img src="pictures/user.png" width="70%"/>(*The mean results for demographic groups.*)
 
 
 Formal results:
