@@ -23,13 +23,27 @@ After labeling the obtained topics there appeared the possibility to assign the 
 
 <img src="pictures/docs_to_users.png" width="100%"/>
 
-Here is how te heatmap for the mean reult looks like.
+To visualize the difference between all the age/sex segments there was taken mean value of the most allocated clusters of each topic for each segment 
 
 <img src="pictures/heatmap.png" width="100%"/>(*The mean results for demographic groups.*)
 
 
 
 # Results
+Motivated intruider testing results: 
+- Test with reidentification rate 98.5%
+- 7% of targeted records that pose reidentification risk
+The representations given as an input to the created model can be recreated with the cosine similarity of 0.95 in the new synthetic user feed which is fully anonymized.
 
-Up-to-date version in Google Colab text generation: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1E9r72m0Fz3GloFDNEOKO4IZRcOvi-9-3?usp=sharing)
-      
+
+To generate differentialy private datasets I used pre-treained network: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1E9r72m0Fz3GloFDNEOKO4IZRcOvi-9-3?usp=sharing)
+
+The example of differetialy private social media feed which was created using the given algorithm.
+
+<img src="pictures/heatmap.png" width="100%"/>(*The mean results for demographic groups.*)
+
+
+Formal results:
+
+- Created reproducible models for extracting users interest representations
+- Created and tested the algorithm for anonymization of datasets based on the semantics of any topic representation 
