@@ -1,9 +1,9 @@
 # Text data anonymization of social network users based on vector representations of their interests
 Main target of the research is to provide text generation based on the topics representations to ensure high-quality anonymization of personal texts while maintaining the distribution of interests of the initial data.
 The objectives of the study are 
-    to try out different methods of topic modeling and labeling of the dataset and look through the quality of their results; 
-    segmentation of the users according to their topics’ representation and demographic data; creating of new representations and imbedding it into the text generation pipeline.; 
-    generation of fully anonymized dataset according to the obtained representations; testing and evaluation of the created pipeline 
+- to try out different methods of topic modeling and labeling of the dataset and look through the quality of their results; 
+- segmentation of the users according to their topics’ representation and demographic data; creating of new representations and imbedding it into the text generation pipeline.; 
+- generation of fully anonymized dataset according to the obtained representations; testing and evaluation of the created pipeline 
 
 
 <img src="pictures/pipeline.png" width="100%"/> (*Suggested approach for text anonymization algorithm*)
