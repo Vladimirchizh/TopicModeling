@@ -25,7 +25,9 @@ After labeling the obtained topics there appeared the possibility to assign the 
 
 To visualize the difference between all the age/sex segments there was taken mean value of the most allocated clusters of each topic for each segment 
 
-<img src="pictures/heatmap.png" width="80%"/>(*The mean results for demographic groups.*)
+<img src="pictures/heatmap.png" width="80%"/>
+
+(*The mean results for demographic groups.*)
 
 
 
@@ -40,7 +42,10 @@ To generate differentialy private datasets I used pre-treained network: [![Open 
 
 The example of differetialy private social media feed which was created using the given algorithm.
 
-<img src="pictures/user.png" width="70%"/>(*The mean results for demographic groups.*)
+<img src="pictures/user.png" width="80%"/>
+
+*Example of the synthetic feed created using the topic representation of particular demographic group: men aged between 63 and 72.*
+For this particular user the representation of interests was chosen as the one replicating the existing cluster for the demographic group of men with the age between 63 and 72: Vacations – 7.1%, Art & Theaters – 7.4%, House renovation – 5.9%, Cars – 5.9%, etc.
 
 
 Formal results:
