@@ -25,7 +25,7 @@ After labeling the obtained topics there appeared the possibility to assign the 
 
 To visualize the difference between all the age/sex segments there was taken mean value of the most allocated clusters of each topic for each segment 
 
-<img src="pictures/heatmap.png" width="100%"/>(*The mean results for demographic groups.*)
+<img src="pictures/heatmap.png" width="80%"/>(*The mean results for demographic groups.*)
 
 
 
@@ -40,7 +40,7 @@ To generate differentialy private datasets I used pre-treained network: [![Open 
 
 The example of differetialy private social media feed which was created using the given algorithm.
 
-<img src="pictures/heatmap.png" width="100%"/>(*The mean results for demographic groups.*)
+<img src="pictures/user.png" width="100%"/>(*The mean results for demographic groups.*)
 
 
 Formal results:
