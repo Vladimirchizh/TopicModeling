@@ -23,10 +23,13 @@ After labeling the obtained topics there appeared the possibility to assign the 
 
 <img src="pictures/docs_to_users.png" width="100%"/>
 
+Here is how te heatmap for the mean reult looks like.
+
+<img src="pictures/heatmap.png" width="100%"/>(*The mean results for demographic groups.*)
 
 
-(The mean results for demographic groups.)
 
-# New
+# Results
+
 Up-to-date version in Google Colab text generation: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1E9r72m0Fz3GloFDNEOKO4IZRcOvi-9-3?usp=sharing)
       
