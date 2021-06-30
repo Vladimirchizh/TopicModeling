@@ -6,6 +6,7 @@ The objectives of the study are
 - generation of fully anonymized dataset according to the obtained representations; testing and evaluation of the created pipeline 
 
 
+
 <img src="pictures/pipeline.png" width="100%"/> (*Suggested approach for text anonymization algorithm*)
 
 To achieve the purpose of the research (to create a generative model out of word embedding which will take into the account the main interests of social media users and will match the requirements of differential privacy) there was created a pipeline of the research. 
